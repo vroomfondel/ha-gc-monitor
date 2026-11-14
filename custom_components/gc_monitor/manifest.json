@@ -1,0 +1,14 @@
+{
+  "domain": "gc_monitor",
+  "name": "GC Monitor",
+  "codeowners": ["@vroomfondel"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/vroomfondel/ha-gc-monitor",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/vroomfondel/ha-gc-monitor/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.3.0"
+}
