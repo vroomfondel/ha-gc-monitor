@@ -1,5 +1,11 @@
 {
   "config": {
+    "step": {
+      "user": {
+        "title": "GC Monitor",
+        "description": "Measure garbage collector pauses and freeze long-lived objects after startup."
+      }
+    },
     "abort": {
       "single_instance_allowed": "Already configured. Only a single configuration possible."
     }
