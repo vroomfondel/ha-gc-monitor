@@ -4,19 +4,30 @@ import gc
 import logging
 import time
 from datetime import datetime
+from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.core import ServiceCall
 from homeassistant.core import callback
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.start import async_at_started
+from homeassistant.helpers.typing import ConfigType
 
+from .const import CONF_REFREEZE_HOURS
+from .const import DEFAULT_REFREEZE_HOURS
 from .const import DOMAIN
 from .const import FREEZE_DELAY_SECONDS
 from .const import FULL_GENERATION
+from .const import SERVICE_REFREEZE
 from .const import WARN_SECONDS
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 class GcPauseLogger:
@@ -50,24 +61,46 @@ class GcPauseLogger:
         )
 
 
-@callback
-def _freeze(now: datetime) -> None:
-    """Collect once and move all surviving objects to the permanent generation.
+def collect_and_freeze(reason: str) -> None:
+    """Thaw frozen objects, collect everything once and freeze the survivors.
 
     Args:
-        now: Fire time passed by the scheduler.
+        reason: Trigger written to the log.
     """
-    if gc.get_freeze_count():
-        return
     started = time.perf_counter()
+    thawed = gc.get_freeze_count()
+    gc.unfreeze()
     collected = gc.collect()
     gc.freeze()
     _LOGGER.info(
-        "gc freeze done, frozen=%s collected=%s duration=%.3fs",
+        "gc freeze done, reason=%s thawed=%s frozen=%s collected=%s duration=%.3fs",
+        reason,
+        thawed,
         gc.get_freeze_count(),
         collected,
         time.perf_counter() - started,
     )
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the refreeze service.
+
+    Args:
+        hass: Home Assistant instance.
+        config: YAML configuration, unused.
+
+    Returns:
+        Always ``True``.
+    """
+
+    @callback
+    def _handle_refreeze(call: ServiceCall) -> None:
+        if DOMAIN not in hass.data:
+            raise ServiceValidationError("GC Monitor is not loaded")
+        collect_and_freeze("service")
+
+    hass.services.async_register(DOMAIN, SERVICE_REFREEZE, _handle_refreeze)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -83,14 +116,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     pause_logger = GcPauseLogger()
     hass.data[DOMAIN] = pause_logger
     gc.callbacks.append(pause_logger)
-    _LOGGER.info("gc monitor active, threshold=%s", gc.get_threshold())
+    hours = int(entry.options.get(CONF_REFREEZE_HOURS, DEFAULT_REFREEZE_HOURS))
+    _LOGGER.info("gc monitor active, threshold=%s refreeze_hours=%s", gc.get_threshold(), hours)
+
+    @callback
+    def _startup_freeze(now: datetime) -> None:
+        collect_and_freeze("startup")
+
+    @callback
+    def _interval_freeze(now: datetime) -> None:
+        collect_and_freeze("interval")
 
     @callback
     def _schedule(hass: HomeAssistant) -> None:
-        entry.async_on_unload(async_call_later(hass, FREEZE_DELAY_SECONDS, _freeze))
+        entry.async_on_unload(async_call_later(hass, FREEZE_DELAY_SECONDS, _startup_freeze))
+        if hours > 0:
+            entry.async_on_unload(async_track_time_interval(hass, _interval_freeze, timedelta(hours=hours)))
 
     entry.async_on_unload(async_at_started(hass, _schedule))
+    entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
+
+
+async def _async_reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the entry after an options change.
+
+    Args:
+        hass: Home Assistant instance.
+        entry: Config entry of this integration.
+    """
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

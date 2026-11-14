@@ -9,5 +9,24 @@
     "abort": {
       "single_instance_allowed": "Already configured. Only a single configuration possible."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "GC Monitor",
+        "data": {
+          "refreeze_hours": "Refreeze interval in hours"
+        },
+        "data_description": {
+          "refreeze_hours": "Thaw, collect and freeze again every N hours. 0 turns the interval off. Each run pauses Home Assistant once for the length of a full collection."
+        }
+      }
+    }
+  },
+  "services": {
+    "refreeze": {
+      "name": "Refreeze",
+      "description": "Thaws the frozen objects, runs one full collection and freezes the survivors again. Pauses Home Assistant once for the length of a full collection."
+    }
   }
 }
