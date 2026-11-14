@@ -1,7 +1,14 @@
 # GC Monitor for Home Assistant
 
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=vroomfondel&repository=ha-gc-monitor&category=integration)
+[![Validate](https://github.com/vroomfondel/ha-gc-monitor/actions/workflows/validate.yml/badge.svg)](https://github.com/vroomfondel/ha-gc-monitor/actions/workflows/validate.yml)
+
 A small custom integration that measures the garbage collector pauses of the Home Assistant core process
 and shortens them by freezing the objects that exist after startup.
+
+Symptoms it addresses: Home Assistant freezes for one to several seconds at regular intervals, entities
+briefly turn *unavailable*, KNX/IP tunnels get disconnected (`Received DisconnectRequest from tunnelling
+server`), and updates of polling integrations run late.
 
 ## Why
 
@@ -96,7 +103,8 @@ automation:
 
 ## Installation
 
-HACS: add this repository as a custom repository of type *Integration*, install *GC Monitor*, restart
+HACS: use the button at the top, or add this repository as a custom repository of type *Integration*,
+install *GC Monitor*, restart
 Home Assistant, then add the integration under *Settings → Devices & services*. It works without
 configuration; the only option is the refreeze interval.
 

@@ -4,7 +4,10 @@ on:
   push:
   pull_request:
   schedule:
-    - cron: "17 4 * * 1"
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions: {}
 
 jobs:
   hassfest:
@@ -16,7 +19,7 @@ jobs:
   hacs:
     runs-on: ubuntu-latest
     steps:
-      - uses: hacs/action@main
+      - name: HACS validation
+        uses: hacs/action@main
         with:
           category: integration
-          ignore: brands
